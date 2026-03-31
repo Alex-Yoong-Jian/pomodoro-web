@@ -121,6 +121,12 @@
       <div class="yt-status" id="yt-status">Click play to start music</div>
     </div>
 
+  <div style="text-align:center; padding: 1rem 0 1.5rem; opacity: 0.35;">
+    <span style="font-size:11px; color:#fff; letter-spacing:0.05em;">
+      visitors: <span id="visitor-count">...</span>
+    </span>
+  </div>
+
   </div>
 </div>
 
@@ -327,6 +333,11 @@ resizeCanvas();
 window.addEventListener('resize',resizeCanvas);
 renderDisplay();renderDots();renderStats();renderTracks();
 animLoop();
+
+fetch('https://api.countapi.xyz/hit/pomodoro-timer-alex/visits')
+  .then(r=>r.json())
+  .then(d=>{ document.getElementById('visitor-count').textContent=d.value.toLocaleString(); })
+  .catch(()=>{ document.getElementById('visitor-count').textContent='—'; });
 </script>
 </body>
 </html>
