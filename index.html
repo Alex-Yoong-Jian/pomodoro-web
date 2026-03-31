@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pomodoro Timer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+    .pom-root { position: relative; min-height: 100vh; overflow: hidden; background: linear-gradient(160deg, #1a2a1a 0%, #2d3a2d 40%, #1a2535 100%); }
+    .pom-wrap { position: relative; z-index: 1; padding: 1.5rem 1rem; max-width: 480px; margin: 0 auto; }
+    .mode-tabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 1.5rem; }
+    .mode-tab { padding: 6px 16px; border-radius: 20px; font-size: 13px; border: 0.5px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); cursor: pointer; transition: all 0.2s; }
+    .mode-tab.active { background: rgba(83,74,183,0.7); color: #fff; border-color: rgba(83,74,183,0.5); font-weight: 500; }
+    .timer-card { background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 0.5px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 2rem 1.5rem; text-align: center; margin-bottom: 1rem; }
+    .session-label { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 0.5rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .timer-display { font-size: 72px; font-weight: 500; color: #fff; letter-spacing: -2px; line-height: 1; margin-bottom: 1.5rem; font-variant-numeric: tabular-nums; }
+    .progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-bottom: 1.5rem; overflow: hidden; }
+    .progress-fill { height: 100%; background: #7F77DD; border-radius: 2px; transition: width 1s linear; }
+    .controls { display: flex; gap: 12px; justify-content: center; align-items: center; }
+    .btn-main { padding: 10px 32px; border-radius: 20px; font-size: 15px; font-weight: 500; background: #534AB7; color: #fff; border: none; cursor: pointer; transition: opacity 0.2s; }
+    .btn-main:hover { opacity: 0.85; }
+    .btn-icon { width: 36px; height: 36px; border-radius: 50%; border: 0.5px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .btn-icon:hover { background: rgba(255,255,255,0.15); }
+    .session-dots { display: flex; gap: 6px; justify-content: center; margin-top: 1rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+    .dot.done { background: #7F77DD; }
+    .music-card { background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 0.5px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .music-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .music-title { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); }
+    .music-toggle { width: 32px; height: 32px; border-radius: 50%; background: #534AB7; border: none; color: #fff; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+    .track-list { display: flex; flex-direction: column; gap: 4px; }
+    .track { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+    .track:hover { background: rgba(255,255,255,0.08); }
+    .track.active { background: rgba(83,74,183,0.35); }
+    .track-num { font-size: 12px; color: rgba(255,255,255,0.35); width: 16px; text-align: center; }
+    .track-name { font-size: 13px; color: rgba(255,255,255,0.85); }
+    .track-src { font-size: 11px; color: rgba(255,255,255,0.35); }
+    .vol-row { display: flex; align-items: center; gap: 10px; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 0.5px solid rgba(255,255,255,0.1); }
+    .vol-label { font-size: 12px; color: rgba(255,255,255,0.5); white-space: nowrap; }
+    .vol-row input[type=range] { flex: 1; accent-color: #534AB7; }
+    .stats-row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+    .stat { background: rgba(255,255,255,0.08); border: 0.5px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 0.75rem; text-align: center; }
+    .stat-val { font-size: 20px; font-weight: 500; color: #fff; }
+    .stat-lbl { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+    .scene-toggle { display: flex; gap: 6px; justify-content: center; margin-bottom: 1rem; }
+    .scene-btn { padding: 4px 12px; border-radius: 12px; font-size: 12px; border: 0.5px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.55); cursor: pointer; }
+    .scene-btn.active { background: rgba(255,255,255,0.18); color: #fff; }
+  </style>
+</head>
+<body>
+<div class="pom-root" id="pom-root">
+  <canvas id="bg-canvas"></canvas>
+  <div class="pom-wrap">
+    <div class="scene-toggle">
+      <button class="scene-btn active" onclick="setScene('leaves')">Leaves</button>
+      <button class="scene-btn" onclick="setScene('snow')">Snow</button>
+      <button class="scene-btn" onclick="setScene('rain')">Rain</button>
+      <button class="scene-btn" onclick="setScene('fireflies')">Fireflies</button>
+    </div>
+    <div class="mode-tabs">
+      <button class="mode-tab active" onclick="setMode('work')">Focus</button>
+      <button class="mode-tab" onclick="setMode('short')">Short break</button>
+      <button class="mode-tab" onclick="setMode('long')">Long break</button>
+    </div>
+    <div class="timer-card">
+      <div class="session-label" id="session-label">Focus session</div>
+      <div class="timer-display" id="timer-display">25:00</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:100%"></div></div>
+      <div class="controls">
+        <button class="btn-icon" onclick="resetTimer()" title="Reset">&#8635;</button>
+        <button class="btn-main" id="btn-startstop" onclick="toggleTimer()">Start</button>
+        <button class="btn-icon" onclick="skipSession()" title="Skip">&#8677;</button>
+      </div>
+      <div class="session-dots" id="session-dots"></div>
+    </div>
+    <div class="stats-row" style="margin-bottom:1rem;">
+      <div class="stat"><div class="stat-val" id="stat-sessions">0</div><div class="stat-lbl">Sessions</div></div>
+      <div class="stat"><div class="stat-val" id="stat-focus">0</div><div class="stat-lbl">Focus mins</div></div>
+      <div class="stat"><div class="stat-val" id="stat-streak">0</div><div class="stat-lbl">Streak</div></div>
+    </div>
+    <div class="music-card">
+      <div class="music-header">
+        <span class="music-title">Background music</span>
+        <button class="music-toggle" id="music-toggle-btn" onclick="toggleMusic()">&#9654;</button>
+      </div>
+      <div class="track-list" id="track-list"></div>
+      <div class="vol-row">
+        <span class="vol-label">Volume</span>
+        <input type="range" min="0" max="100" value="40" step="1" oninput="setVolume(this.value)" />
+      </div>
+    </div>
+  </div>
+</div>
+<audio id="audio-player" loop></audio>
+<audio id="bell-sound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn@main/build/testable-projects-fcc/audio/BeepSound.wav"></audio>
+<script>
+const MODES = {
+  work:  { label: 'Focus session', mins: 25 },
+  short: { label: 'Short break',   mins: 5  },
+  long:  { label: 'Long break',    mins: 15 }
+};
+const TRACKS = [
+  { name: 'Lo-fi chill beats', src: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3', author: 'Pixabay' },
+  { name: 'Ambient focus',     src: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8cb6f44e62.mp3', author: 'Pixabay' },
+  { name: 'Soft piano',        src: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0c6ff1bab.mp3', author: 'Pixabay' },
+  { name: 'Nature sounds',     src: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c8c8a73467.mp3', author: 'Pixabay' },
+];
+let mode='work', totalSecs=1500, remaining=1500;
+let running=false, interval=null;
+let sessionsCompleted=0, focusMins=0, streak=0;
+let currentTrack=0, musicPlaying=false;
+let scene='leaves', particles=[];
+const audio=document.getElementById('audio-player');
+const bell=document.getElementById('bell-sound');
+const canvas=document.getElementById('bg-canvas');
+const ctx=canvas.getContext('2d');
+const SCENES={
+  leaves:{bg:['#1a2a1a','#2d3a2d','#1a2535'],count:38,
+    make:(W,H)=>({x:Math.random()*W,y:-20,size:6+Math.random()*10,speedY:0.6+Math.random()*1.2,speedX:-0.5+Math.random()*1,rot:Math.random()*360,rotSpeed:(-1+Math.random()*2)*1.2,sway:Math.random()*2,swaySpeed:0.01+Math.random()*0.02,swayOffset:Math.random()*Math.PI*2,color:['#5a8a3a','#7aaa4a','#3a6a2a','#8aaa5a','#c8a030','#d4602a'][Math.floor(Math.random()*6)],t:0,W,H}),
+    draw:(p)=>{ctx.save();ctx.translate(p.x+Math.sin(p.swayOffset+p.t*p.swaySpeed)*p.sway*18,p.y);ctx.rotate(p.rot*Math.PI/180);ctx.fillStyle=p.color;ctx.globalAlpha=0.82;ctx.beginPath();ctx.ellipse(0,0,p.size*0.45,p.size,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(0,-p.size);ctx.lineTo(0,p.size);ctx.stroke();ctx.restore();},
+    update:(p)=>{p.t++;p.y+=p.speedY;p.x+=p.speedX+Math.cos(p.swayOffset+p.t*p.swaySpeed)*0.4;p.rot+=p.rotSpeed;return p.y<p.H+30;}},
+  snow:{bg:['#1a2535','#253045','#1a2030'],count:60,
+    make:(W,H)=>({x:Math.random()*W,y:-10,size:2+Math.random()*5,speedY:0.4+Math.random()*0.9,speedX:-0.3+Math.random()*0.6,opacity:0.4+Math.random()*0.5,swaySpeed:0.008+Math.random()*0.015,t:Math.random()*100,W,H}),
+    draw:(p)=>{ctx.save();ctx.globalAlpha=p.opacity;ctx.fillStyle='#d0e8ff';ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.restore();},
+    update:(p)=>{p.t++;p.y+=p.speedY;p.x+=p.speedX+Math.sin(p.t*p.swaySpeed)*0.5;return p.y<p.H+10;}},
+  rain:{bg:['#111820','#1a2530','#0e1520'],count:80,
+    make:(W,H)=>({x:Math.random()*W,y:Math.random()*H*-1,len:10+Math.random()*20,speed:8+Math.random()*8,opacity:0.2+Math.random()*0.4,W,H}),
+    draw:(p)=>{ctx.save();ctx.globalAlpha=p.opacity;ctx.strokeStyle='#a0c8e8';ctx.lineWidth=0.7;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.len*0.2,p.y+p.len);ctx.stroke();ctx.restore();},
+    update:(p)=>{p.y+=p.speed;p.x-=p.speed*0.2;return p.y<p.H+30;}},
+  fireflies:{bg:['#0a1a10','#0e2015','#0a1520'],count:30,
+    make:(W,H)=>({x:Math.random()*W,y:Math.random()*H,r:2+Math.random()*3,speedX:(-0.4+Math.random()*0.8)*0.6,speedY:(-0.4+Math.random()*0.8)*0.6,phase:Math.random()*Math.PI*2,phaseSpeed:0.02+Math.random()*0.03,t:0,W,H}),
+    draw:(p)=>{const g=(Math.sin(p.phase+p.t*p.phaseSpeed)+1)/2;ctx.save();ctx.globalAlpha=0.15+g*0.7;ctx.fillStyle='#c8f060';ctx.beginPath();ctx.arc(p.x,p.y,p.r+g*2,0,Math.PI*2);ctx.fill();ctx.restore();},
+    update:(p)=>{p.t++;p.x+=p.speedX;p.y+=p.speedY;if(p.x<0)p.x=p.W;if(p.x>p.W)p.x=0;if(p.y<0)p.y=p.H;if(p.y>p.H)p.y=0;return true;}}
+};
+function setScene(s){scene=s;particles=[];document.querySelectorAll('.scene-btn').forEach((b,i)=>{b.classList.toggle('active',['leaves','snow','rain','fireflies'][i]===s);});const bg=SCENES[s].bg;document.getElementById('pom-root').style.background='linear-gradient(160deg,'+bg[0]+' 0%,'+bg[1]+' 40%,'+bg[2]+' 100%)';}
+function resizeCanvas(){const r=document.getElementById('pom-root');canvas.width=r.offsetWidth||window.innerWidth;canvas.height=Math.max(r.offsetHeight,window.innerHeight);}
+function animLoop(){ctx.clearRect(0,0,canvas.width,canvas.height);const sc=SCENES[scene];const W=canvas.width,H=canvas.height;while(particles.length<sc.count)particles.push(sc.make(W,H));particles=particles.filter(p=>{sc.draw(p);return sc.update(p);});while(particles.length<sc.count)particles.push(sc.make(W,H));requestAnimationFrame(animLoop);}
+function pad(n){return String(n).padStart(2,'0');}
+function renderDisplay(){document.getElementById('timer-display').textContent=pad(Math.floor(remaining/60))+':'+pad(remaining%60);document.getElementById('progress-fill').style.width=Math.round((remaining/totalSecs)*100)+'%';}
+function renderDots(){const el=document.getElementById('session-dots');el.innerHTML='';for(let i=0;i<4;i++){const d=document.createElement('div');d.className='dot'+(i<sessionsCompleted%4?' done':'');el.appendChild(d);}}
+function renderStats(){document.getElementById('stat-sessions').textContent=sessionsCompleted;document.getElementById('stat-focus').textContent=focusMins;document.getElementById('stat-streak').textContent=streak;}
+function renderTracks(){const el=document.getElementById('track-list');el.innerHTML='';TRACKS.forEach((t,i)=>{const div=document.createElement('div');div.className='track'+(i===currentTrack?' active':'');div.innerHTML='<span class="track-num">'+(i+1)+'</span><div class="track-info"><div class="track-name">'+t.name+'</div><div class="track-src">'+t.author+' — royalty free</div></div>';div.onclick=()=>selectTrack(i);el.appendChild(div);});}
+function setMode(m){mode=m;running=false;clearInterval(interval);document.getElementById('btn-startstop').textContent='Start';totalSecs=MODES[m].mins*60;remaining=totalSecs;document.getElementById('session-label').textContent=MODES[m].label;document.querySelectorAll('.mode-tab').forEach((el,i)=>{el.classList.toggle('active',['work','short','long'][i]===m);});renderDisplay();}
+function toggleTimer(){if(running){running=false;clearInterval(interval);document.getElementById('btn-startstop').textContent='Resume';}else{running=true;document.getElementById('btn-startstop').textContent='Pause';interval=setInterval(()=>{remaining--;if(remaining<=0){clearInterval(interval);running=false;onSessionEnd();}renderDisplay();},1000);}}
+function onSessionEnd(){try{bell.play();}catch(e){}if(mode==='work'){sessionsCompleted++;focusMins+=MODES.work.mins;streak++;renderDots();renderStats();if(sessionsCompleted%4===0)setMode('long');else setMode('short');}else{setMode('work');}document.getElementById('btn-startstop').textContent='Start';}
+function resetTimer(){running=false;clearInterval(interval);remaining=totalSecs;document.getElementById('btn-startstop').textContent='Start';renderDisplay();}
+function skipSession(){running=false;clearInterval(interval);onSessionEnd();}
+function selectTrack(i){currentTrack=i;audio.src=TRACKS[i].src;if(musicPlaying)audio.play().catch(()=>{});renderTracks();}
+function toggleMusic(){if(musicPlaying){audio.pause();musicPlaying=false;document.getElementById('music-toggle-btn').innerHTML='&#9654;';}else{audio.src=TRACKS[currentTrack].src;audio.play().catch(()=>{});musicPlaying=true;document.getElementById('music-toggle-btn').innerHTML='&#9646;&#9646;';}}
+function setVolume(v){audio.volume=v/100;}
+audio.volume=0.4;
+resizeCanvas();
+window.addEventListener('resize',resizeCanvas);
+renderDisplay();renderDots();renderStats();renderTracks();
+animLoop();
+</script>
+</body>
+</html>
